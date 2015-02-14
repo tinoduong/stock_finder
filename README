@@ -1,0 +1,15 @@
+
+gen_symbols.py
+ 
+This script will create output files for all stock symbols in given industries
+
+
+load_db.py
+
+This script will take the files generate by the above script, iterate through each symbol and
+find stock information on it. It will then store information into a mongo database
+
+Dependencies:
+
+pyQuery
+pyMongo
