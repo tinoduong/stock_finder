@@ -9,6 +9,7 @@ Meant to be executed once a day (at market close)
 """
 
 import urllib2
+import re
 from pymongo import MongoClient
 from Symbol import Symbol
 from threading import Thread
@@ -22,6 +23,7 @@ BASE_URL = "http://finance.yahoo.com/q?s="
 client = MongoClient('localhost', 27017)
 db = client.stock_finder
 stocks = db.stocks
+sectors = db.sectors
 
 # worker function for thread. Calls get_url
 # then calls process_response
@@ -30,9 +32,10 @@ def worker():
         obj = q.get()
         ticker = obj[0]
         name = obj[1]
+        sect = obj[2]
 
         content = get_url(ticker)
-        process_response(content, name, ticker)
+        process_response(content, name, ticker, sect)
 
         q.task_done()
 
@@ -43,13 +46,14 @@ def get_url(symbol):
 # This function processes an http request
 # it will then upsert the information into the
 # mongo datastore
-def process_response(content, name, ticker):
+def process_response(content, name, ticker, sect):
     try:
         symbol = Symbol(content, name, ticker)
 
         if symbol:
             print "Inserting ... " + ticker
             stocks.update({"_id": ticker}, symbol, upsert=True)
+            sectors.update({"_id": sect}, {"$addToSet": {"symbols": ticker}}, upsert=True);
 
     except:
         return "error"
@@ -66,6 +70,7 @@ for i in range(NUMB_WORKERS):
 for file_name in FILES:
 
     f = open(PREFIX + file_name, 'r')
+    sector = re.match(r"(\w*)", file_name).group(1)
 
     # retrieve stock info for each symbol
     for line in f:
@@ -73,7 +78,7 @@ for file_name in FILES:
         tokens = line.split(";")
 
         if len(tokens) == 2:
-            q.put((tokens[0], tokens[1]))
+            q.put((tokens[0], tokens[1], sector))
 
 
 q.join()
