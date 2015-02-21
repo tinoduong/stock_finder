@@ -16,7 +16,7 @@ from threading import Thread
 from Queue import Queue
 
 NUMB_WORKERS = 50
-FILES = ["Custom.csv"]
+FILES = ["Technology.csv","Finance.csv","Favourites.csv"]
 PREFIX = "data/"
 BASE_URL = "http://finance.yahoo.com/q?s="
 
@@ -52,8 +52,12 @@ def process_response(content, name, ticker, sect):
 
         if symbol:
             print "Inserting ... " + ticker
-            stocks.update({"_id": ticker}, symbol, upsert=True)
-            sectors.update({"_id": sect}, {"$addToSet": {"symbols": ticker}}, upsert=True);
+
+            # insert/update sector array field first in case ticker already exists
+            # then add in the rest of the ticker symbol using a set, so we don't blow
+            # away the 'sector' attribute
+            stocks.update({"_id": ticker}, {"$addToSet": {"sector": sect}}, upsert=True)
+            stocks.update({"_id": ticker}, {"$set": symbol}, upsert=True)
 
     except:
         return "error"

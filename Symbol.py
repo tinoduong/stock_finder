@@ -50,8 +50,6 @@ def Symbol(content, name, ticker):
 
     # get header info
     obj["price"] = string_to_float(dom.find(".time_rtq_ticker span").text())
-    obj["daily_dollar_gain"] = string_to_float(dom.find("#yfs_c63_"+ticker.lower()).text())
-    obj["daily_percentage_gain"] = string_to_float(re.sub("[()%]", "", dom.find("#yfs_p43_"+ticker.lower()).text()))
 
     # get first column
     obj["prev_close"] = string_to_float(pq(col1[0]).text())
@@ -79,5 +77,9 @@ def Symbol(content, name, ticker):
     if len(div_yield) > 1:
         obj["div_yield_dollar"] = string_to_float(div_yield[0])
         obj["div_yield_percent"] = string_to_float(re.sub("[()%]", "", div_yield[1]))
+
+    obj["daily_dollar_gain"] = obj["price"] - obj["prev_close"]
+    obj["daily_percentage_gain"] = round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2);
+
 
     return obj
