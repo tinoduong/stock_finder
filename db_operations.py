@@ -1,7 +1,5 @@
 import sqlite3
 
-
-
 def create_db():
 
     print "Creating database ..."
@@ -11,7 +9,7 @@ def create_db():
 
         CREATE TABLE IF NOT EXISTS stocks
         (id INTEGER PRIMARY KEY,
-         ticker TEXT unique,
+         symbol TEXT unique,
          name TEXT,
          price REAL,
          prev_close REAL,
@@ -44,10 +42,10 @@ def create_db():
     cursor.execute('''
 
         CREATE TABLE IF NOT EXISTS sectors_mapping
-        (ticker TEXT,
+        (symbol TEXT,
          sector TEXT,
-         PRIMARY KEY(ticker, sector)
-         FOREIGN KEY(ticker) REFERENCES stocks(ticker),
+         PRIMARY KEY(symbol, sector)
+         FOREIGN KEY(symbol) REFERENCES stocks(symbol),
          FOREIGN KEY(sector) REFERENCES sectors(sector)
         )
 
@@ -66,17 +64,17 @@ def insert_sectors(sector):
     db.close()
 
 
-def insert_row(symbol, sector, db):
+def insert_row(stock, sector, db):
 
     cursor = db.cursor();
-    print "Inserting " + symbol["ticker"]
+    print stock["symbol"] + " added to db"
 
-    cursor.execute("DELETE FROM stocks where ticker = ?", (symbol["ticker"],))
+    cursor.execute("DELETE FROM stocks where symbol = ?", (stock["symbol"],))
 
     cursor.execute('''
 
                 INSERT INTO
-                stocks( ticker,
+                stocks( symbol,
                         name,
                         price,
                         prev_close,
@@ -94,7 +92,7 @@ def insert_row(symbol, sector, db):
                         div_yield_percent,
                         daily_dollar_gain,
                         daily_percentage_gain)
-                VALUES( :ticker,
+                VALUES( :symbol,
                         :name,
                         :price,
                         :prev_close,
@@ -113,8 +111,8 @@ def insert_row(symbol, sector, db):
                         :daily_dollar_gain,
                         :daily_percentage_gain)
 
-                ''', symbol)
+                ''', stock)
 
-    cursor.execute("INSERT OR IGNORE INTO sectors_mapping (ticker, sector) VALUES(?,?)", (symbol["ticker"], sector))
+    cursor.execute("INSERT OR IGNORE INTO sectors_mapping (symbol, sector) VALUES(?,?)", (stock["symbol"], sector))
 
     db.commit()

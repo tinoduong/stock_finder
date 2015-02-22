@@ -35,7 +35,8 @@ def parse_date(value):
     return "N/A"
 
 
-def Symbol(content, name, ticker):
+
+def Stock(content, symbol, name):
     dom = pq(content)
     col1 = dom.find("#table1 .yfnc_tabledata1")
     col2 = dom.find("#table2 .yfnc_tabledata1")
@@ -46,7 +47,7 @@ def Symbol(content, name, ticker):
     obj = {}
 
     obj["name"] = name.strip().replace("\n", "")
-    obj["ticker"] = ticker
+    obj["symbol"] = symbol
 
     # get header info
     obj["price"] = string_to_float(dom.find(".time_rtq_ticker span").text())
@@ -62,37 +63,28 @@ def Symbol(content, name, ticker):
     year_range = pq(col2[1]).text().split("-")
     div_yield = pq(col2[7]).text().split(" ")
 
-    if len(day_range) > 1:
-        obj["day_low"] = string_to_float(day_range[0])
-        obj["day_high"] = string_to_float(day_range[1])
-    else:
-        obj["day_low"] = 0
-        obj["day_high"] = 0
 
-    if len(year_range) > 1:
-        obj["year_low"] = string_to_float(year_range[0])
-        obj["year_high"] = string_to_float(year_range[1])
-    else:
-        obj["year_low"] = 0
-        obj["year_high"] = 0
+    obj["day_low"] = len(day_range) > 1 and string_to_float(day_range[0]) or 0
+    obj["day_high"] = len(day_range) > 1 and string_to_float(day_range[1]) or 0
+
+
+    obj["year_low"] = len(year_range) > 1 and string_to_float(year_range[0]) or 0
+    obj["year_high"] = len(year_range) > 1 and string_to_float(year_range[1]) or 0
 
     obj["market_cap"] = pq(col2[4]).text()
     obj["pe"] = string_to_float(pq(col2[5]).text())
     obj["eps"] = string_to_float(pq(col2[6]).text())
 
-    if len(div_yield) > 1:
-        obj["div_yield_dollar"] = string_to_float(div_yield[0])
-        obj["div_yield_percent"] = string_to_float(re.sub("[()%]", "", div_yield[1]))
-    else:
-        obj["div_yield_dollar"] = 0
-        obj["div_yield_percent"] = 0
+
+    obj["div_yield_dollar"] = len(div_yield) > 1 and string_to_float(div_yield[0]) or 0
+    obj["div_yield_percent"] = len(div_yield) > 1 and string_to_float(re.sub("[()%]", "", div_yield[1])) or 0
 
     obj["daily_dollar_gain"] = obj["price"] - obj["prev_close"]
 
-    if obj["prev_close"] == 0:
-        obj["daily_percentage_gain"] = 100;
-    else:
-        obj["daily_percentage_gain"] = round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2);
+
+    obj["daily_percentage_gain"] = obj["prev_close"] != 0 and \
+                                   round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2) or \
+                                   100
 
 
     return obj

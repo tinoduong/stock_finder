@@ -12,49 +12,50 @@ import urllib2
 import re
 import time
 
-from Symbol import Symbol
+from Stock import Stock
 from threading import Thread
 from Queue import Queue
 
-import queries
+import db_operations
 
 NUMB_WORKERS = 50
-FILES = [ "Favourites.csv"]
+FILES = [ "Technology.csv", "Finance.csv", "Favourites.csv"]
 PREFIX = "data/"
 BASE_URL = "http://finance.yahoo.com/q?s="
 
 #create the database
-queries.create_db()
+db_operations.create_db()
 
-symbol_queue = Queue()
-
+stock_queue = Queue()
 
 # worker function for thread. Calls get_url
 # then calls process_response
-def fetch_symbol():
+def fetch_stock():
     while True:
         obj = q.get()
-        ticker = obj[0]
+        symbol = obj[0]
         name = obj[1]
         sect = obj[2]
 
-        content = urllib2.urlopen(BASE_URL + ticker).read()
-        symbol = Symbol(content, name, ticker)
+        content = urllib2.urlopen(BASE_URL + symbol).read()
+        stock = Stock(content, symbol, name)
 
-        if symbol:
-            symbol_queue.put((symbol, sect))
+        if stock:
+            stock_queue.put((stock, sect))
 
         q.task_done()
 
 
-def add_symbol():
+def add_stock():
+
     db = sqlite3.connect('db/stock_finder')
     count = 0
+
     while True:
 
-        while symbol_queue.qsize() > 0:
-            obj = symbol_queue.get()
-            queries.insert_row(obj[0], obj[1], db)
+        while stock_queue.qsize() > 0:
+            obj = stock_queue.get()
+            db_operations.insert_row(obj[0], obj[1], db)
             count = 0
 
         if count == 10:
@@ -69,12 +70,12 @@ def add_symbol():
 # Initialize thread pool
 q = Queue(NUMB_WORKERS)
 for i in range(NUMB_WORKERS):
-    t = Thread(target=fetch_symbol)
+    t = Thread(target=fetch_stock)
     t.daemon = True
     t.start()
 
 
-w = Thread(target=add_symbol)
+w = Thread(target=add_stock)
 w.start();
 
 # Read every file
@@ -84,9 +85,9 @@ for file_name in FILES:
     sector = re.match(r"(\w*)", file_name).group(1)
 
     # Add sector record
-    queries.insert_sectors(sector)
+    db_operations.insert_sectors(sector)
 
-    # retrieve stock info for each symbol
+    # retrieve stock info for each stock
     for line in f:
 
         tokens = line.split(";")
