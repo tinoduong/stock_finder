@@ -1,79 +1,120 @@
-from pymongo import MongoClient
-from bson.code import Code
-
-client = MongoClient('localhost', 27017)
-db = client.stock_finder
-stocks = db.stocks
-import re
-# All stocks trading within 20% of yearly low
-# def near_fifty_two_week_low(filters=[], low_percent_range=1.3):
-#
-#     sectors = {} if len(filters) == 0 else {"sector": {"$all": filters}}
-#
-#     mapper = Code("""
-#                 function () {
-#                     var price = this.price,
-#                         low = this.year_low,
-#                 """
-#                 "        high = this.year_low * " + str(low_percent_range) + ";"
-#                 """
-#                     if (price <= high) {
-#                         emit(this._id, this);
-#                     }
-#                 }
-#                """)
-#
-#     # no need for reduce because we are only emitting once (on the unique _id)
-#     reducer = Code("")
-#
-#     return stocks.map_reduce(mapper, reducer, "myresults", query=sectors)
-
-def near_fifty_two_week_low(filters=[], low_percent_range=1.3):
-
-    mapper = Code("""
-                  function () {
-                    return this;
-                  }
-                  """)
-
-    dir(stocks.find({}))
-    stocks.find({}).each(mapper)
+import sqlite3
 
 
-# All stocks trading near 52 week low, and just dropped in the last day
-def drop_in_last_day_and_near_low(filters, low_percent_range=1.3, drop_percentage_range=-7):
 
-    sectors = {} if len(filters) == 0 else {"sector": {"$all": filters}}
+def create_db():
 
-    mapper = Code("""
-                function () {
-                    var price = this.price,
-                        daily_percentage_gain = this.daily_percentage_gain,
-                        low = this.year_low,
-                """
-                "       high = this.year_low * " +  str(low_percent_range) + ","
-                "       threshold = " + str(drop_percentage_range) + ";"
-                """
-                    if ((daily_percentage_gain <= threshold) && (price <= high)) {
-                        emit(this._id, this);
-                    }
-                }
-               """)
+    print "Creating database ..."
+    db = sqlite3.connect('db/stock_finder')
+    cursor = db.cursor();
+    cursor.execute('''
 
-    # no need for reduce because we are only emitting once (on the unique _id)
-    reducer = Code("")
+        CREATE TABLE IF NOT EXISTS stocks
+        (id INTEGER PRIMARY KEY,
+         ticker TEXT unique,
+         name TEXT,
+         price REAL,
+         prev_close REAL,
+         open REAL,
+         beta REAL,
+         earnings_date TEXT,
+         day_low REAL,
+         day_high REAL,
+         year_low REAL,
+         year_high REAL,
+         market_cap TEXT,
+         pe REAL,
+         eps REAL,
+         div_yield_dollar REAL,
+         div_yield_percent REAL,
+         daily_dollar_gain REAL,
+         daily_percentage_gain REAL)
 
-    return stocks.map_reduce(mapper, reducer, "myresults", query=sectors)
+    ''')
+
+    cursor.execute('''
+
+        CREATE TABLE IF NOT EXISTS sectors
+        (id INTEGER PRIMARY KEY,
+         sector TEXT unique
+        )
+
+    ''')
+
+    cursor.execute('''
+
+        CREATE TABLE IF NOT EXISTS sectors_mapping
+        (ticker TEXT,
+         sector TEXT,
+         PRIMARY KEY(ticker, sector)
+         FOREIGN KEY(ticker) REFERENCES stocks(ticker),
+         FOREIGN KEY(sector) REFERENCES sectors(sector)
+        )
+
+    ''')
+
+    db.commit()
+    db.close();
 
 
-# All the stocks that dropped at least 7 percent or more today
-def biggest_drop_in_last_day(filters=[], drop_percentage_range=-7):
-    sectors = {} if len(filters) == 0 else {"$all": filters}
-    return stocks.find({"$query": {"daily_percentage_gain": {"$lte": drop_percentage_range}, "sector": sectors},
-                        "$orderby":  {"daily_percentage_gain": 1}})
+def insert_sectors(sector):
+
+    db = sqlite3.connect('db/stock_finder')
+    cursor = db.cursor();
+    cursor.execute('''INSERT OR IGNORE INTO sectors(sector) VALUES(?)''', [sector,])
+    db.commit()
+    db.close()
 
 
-def biggest_gain_in_last_day(filters=[], gain_percentage_range=7):
-    sectors = {} if len(filters) == 0 else {"$all": filters}
-    return stocks.find({"$query": {"daily_percentage_gain": {"$gte": gain_percentage_range}, "sector": sectors},
-                        "$orderby":{"daily_percentage_gain":-1}})
+def insert_row(symbol, sector, db):
+
+    cursor = db.cursor();
+    print "Inserting " + symbol["ticker"]
+
+    cursor.execute("DELETE FROM stocks where ticker = ?", (symbol["ticker"],))
+
+    cursor.execute('''
+
+                INSERT INTO
+                stocks( ticker,
+                        name,
+                        price,
+                        prev_close,
+                        open,
+                        beta,
+                        earnings_date,
+                        day_low,
+                        day_high,
+                        year_low,
+                        year_high,
+                        market_cap,
+                        pe,
+                        eps,
+                        div_yield_dollar,
+                        div_yield_percent,
+                        daily_dollar_gain,
+                        daily_percentage_gain)
+                VALUES( :ticker,
+                        :name,
+                        :price,
+                        :prev_close,
+                        :open,
+                        :beta,
+                        :earnings_date,
+                        :day_low,
+                        :day_high,
+                        :year_low,
+                        :year_high,
+                        :market_cap,
+                        :pe,
+                        :eps,
+                        :div_yield_dollar,
+                        :div_yield_percent,
+                        :daily_dollar_gain,
+                        :daily_percentage_gain)
+
+                ''', symbol)
+
+    cursor.execute("INSERT OR IGNORE INTO sectors_mapping (ticker, sector) VALUES(?,?)", (symbol["ticker"], sector))
+
+    db.commit()

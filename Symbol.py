@@ -8,7 +8,7 @@ def string_to_float(value):
     try:
         toRet = float(value)
     except:
-        toRet = "N/A"
+        toRet = 0.0
 
     return toRet
 
@@ -24,13 +24,13 @@ def parse_date(value):
     exp = re.match(r'(\w{3}\s*\d{1,2})\s*-\s*(\w{3}\s*\d{1,2}).', value.strip(), re.I)
     if exp:
         date = exp.group(1) + " 2015"
-        return datetime.strptime(date, '%b %d %Y')
+        return datetime.strptime(date, '%b %d %Y').isoformat()
 
     # 12-apr-15
     exp = re.match(r'(\d{1,2}-\w{3}-\d{1,2})', value.strip(), re.I)
     if exp:
         date = exp.group(1)
-        return datetime.strptime(date, '%d-%b-%y')
+        return datetime.strptime(date, '%d-%b-%y').isoformat()
 
     return "N/A"
 
@@ -46,7 +46,7 @@ def Symbol(content, name, ticker):
     obj = {}
 
     obj["name"] = name.strip().replace("\n", "")
-    obj["_id"] = ticker
+    obj["ticker"] = ticker
 
     # get header info
     obj["price"] = string_to_float(dom.find(".time_rtq_ticker span").text())
@@ -65,10 +65,16 @@ def Symbol(content, name, ticker):
     if len(day_range) > 1:
         obj["day_low"] = string_to_float(day_range[0])
         obj["day_high"] = string_to_float(day_range[1])
+    else:
+        obj["day_low"] = 0
+        obj["day_high"] = 0
 
     if len(year_range) > 1:
         obj["year_low"] = string_to_float(year_range[0])
         obj["year_high"] = string_to_float(year_range[1])
+    else:
+        obj["year_low"] = 0
+        obj["year_high"] = 0
 
     obj["market_cap"] = pq(col2[4]).text()
     obj["pe"] = string_to_float(pq(col2[5]).text())
@@ -77,9 +83,16 @@ def Symbol(content, name, ticker):
     if len(div_yield) > 1:
         obj["div_yield_dollar"] = string_to_float(div_yield[0])
         obj["div_yield_percent"] = string_to_float(re.sub("[()%]", "", div_yield[1]))
+    else:
+        obj["div_yield_dollar"] = 0
+        obj["div_yield_percent"] = 0
 
     obj["daily_dollar_gain"] = obj["price"] - obj["prev_close"]
-    obj["daily_percentage_gain"] = round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2);
+
+    if obj["prev_close"] == 0:
+        obj["daily_percentage_gain"] = 100;
+    else:
+        obj["daily_percentage_gain"] = round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2);
 
 
     return obj

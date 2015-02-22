@@ -7,74 +7,84 @@ then store it into the mongo database
 Meant to be executed once a day (at market close)
 
 """
-
+import sqlite3
 import urllib2
 import re
-from pymongo import MongoClient
+import time
+
 from Symbol import Symbol
 from threading import Thread
 from Queue import Queue
 
+import queries
+
 NUMB_WORKERS = 50
-FILES = ["Technology.csv","Finance.csv","Favourites.csv"]
+FILES = [ "Favourites.csv"]
 PREFIX = "data/"
 BASE_URL = "http://finance.yahoo.com/q?s="
 
-client = MongoClient('localhost', 27017)
-db = client.stock_finder
-stocks = db.stocks
-sectors = db.sectors
+#create the database
+queries.create_db()
+
+symbol_queue = Queue()
+
 
 # worker function for thread. Calls get_url
 # then calls process_response
-def worker():
+def fetch_symbol():
     while True:
         obj = q.get()
         ticker = obj[0]
         name = obj[1]
         sect = obj[2]
 
-        content = get_url(ticker)
-        process_response(content, name, ticker, sect)
-
-        q.task_done()
-
-# Execute http request and return response
-def get_url(symbol):
-    return urllib2.urlopen(BASE_URL + symbol).read()
-
-# This function processes an http request
-# it will then upsert the information into the
-# mongo datastore
-def process_response(content, name, ticker, sect):
-    try:
+        content = urllib2.urlopen(BASE_URL + ticker).read()
         symbol = Symbol(content, name, ticker)
 
         if symbol:
-            print "Inserting ... " + ticker
+            symbol_queue.put((symbol, sect))
 
-            # insert/update sector array field first in case ticker already exists
-            # then add in the rest of the ticker symbol using a set, so we don't blow
-            # away the 'sector' attribute
-            stocks.update({"_id": ticker}, {"$addToSet": {"sector": sect}}, upsert=True)
-            stocks.update({"_id": ticker}, {"$set": symbol}, upsert=True)
+        q.task_done()
 
-    except:
-        return "error"
 
+def add_symbol():
+    db = sqlite3.connect('db/stock_finder')
+    count = 0
+    while True:
+
+        while symbol_queue.qsize() > 0:
+            obj = symbol_queue.get()
+            queries.insert_row(obj[0], obj[1], db)
+            count = 0
+
+        if count == 10:
+            break;
+        else:
+            time.sleep(1)
+            print "Queue empty sleeping ..."
+            count += 1;
+
+    db.close()
 
 # Initialize thread pool
 q = Queue(NUMB_WORKERS)
 for i in range(NUMB_WORKERS):
-    t = Thread(target=worker)
+    t = Thread(target=fetch_symbol)
     t.daemon = True
     t.start()
+
+
+w = Thread(target=add_symbol)
+w.start();
 
 # Read every file
 for file_name in FILES:
 
     f = open(PREFIX + file_name, 'r')
     sector = re.match(r"(\w*)", file_name).group(1)
+
+    # Add sector record
+    queries.insert_sectors(sector)
 
     # retrieve stock info for each symbol
     for line in f:
