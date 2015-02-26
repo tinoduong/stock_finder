@@ -19,7 +19,7 @@ from Queue import Queue
 import db_operations
 
 NUMB_WORKERS = 50
-FILES = [ "Technology.csv", "Finance.csv", "Favourites.csv"]
+FILES = ["Finance.csv","Technology.csv","Favourites.csv"]
 PREFIX = "data/"
 BASE_URL = "http://finance.yahoo.com/q?s="
 

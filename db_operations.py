@@ -4,7 +4,7 @@ def create_db():
 
     print "Creating database ..."
     db = sqlite3.connect('db/stock_finder')
-    cursor = db.cursor();
+    cursor = db.cursor()
     cursor.execute('''
 
         CREATE TABLE IF NOT EXISTS stocks

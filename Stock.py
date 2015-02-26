@@ -35,6 +35,14 @@ def parse_date(value):
     return "N/A"
 
 
+def get_field(col, row):
+
+    if len(col) < row:
+        return ""
+
+    element = pq(col[row]);
+    return element.text();
+
 
 def Stock(content, symbol, name):
     dom = pq(content)
@@ -53,15 +61,15 @@ def Stock(content, symbol, name):
     obj["price"] = string_to_float(dom.find(".time_rtq_ticker span").text())
 
     # get first column
-    obj["prev_close"] = string_to_float(pq(col1[0]).text())
-    obj["open"] = string_to_float(pq(col1[1]).text())
-    obj["beta"] = string_to_float(pq(col1[5]).text())
-    obj["earnings_date"] = parse_date(pq(col1[6]).text())
+    obj["prev_close"] = string_to_float(get_field(col1, 0))
+    obj["open"] = string_to_float(get_field(col1, 1))
+    obj["beta"] = string_to_float(get_field(col1, 5))
+    obj["earnings_date"] = parse_date(get_field(col1, 6))
 
     # get second column
-    day_range = pq(col2[0]).text().split("-")
-    year_range = pq(col2[1]).text().split("-")
-    div_yield = pq(col2[7]).text().split(" ")
+    day_range = get_field(col2, 0).split("-")
+    year_range = get_field(col2, 1).split("-")
+    div_yield = get_field(col2, 7).split(" ")
 
 
     obj["day_low"] = len(day_range) > 1 and string_to_float(day_range[0]) or 0
@@ -71,9 +79,9 @@ def Stock(content, symbol, name):
     obj["year_low"] = len(year_range) > 1 and string_to_float(year_range[0]) or 0
     obj["year_high"] = len(year_range) > 1 and string_to_float(year_range[1]) or 0
 
-    obj["market_cap"] = pq(col2[4]).text()
-    obj["pe"] = string_to_float(pq(col2[5]).text())
-    obj["eps"] = string_to_float(pq(col2[6]).text())
+    obj["market_cap"] = get_field(col2, 4)
+    obj["pe"] = string_to_float(get_field(col2, 5))
+    obj["eps"] = string_to_float(get_field(col2, 6))
 
 
     obj["div_yield_dollar"] = len(div_yield) > 1 and string_to_float(div_yield[0]) or 0
@@ -85,6 +93,5 @@ def Stock(content, symbol, name):
     obj["daily_percentage_gain"] = obj["prev_close"] != 0 and \
                                    round(((obj["price"] - obj["prev_close"])/obj["prev_close"]) * 100, 2) or \
                                    100
-
 
     return obj
